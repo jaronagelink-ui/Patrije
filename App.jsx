@@ -93,6 +93,13 @@ function OrnamentalDivider({ type }) {
   );
 }
 
+function getAppPathParts() {
+  const appPath = window.location.pathname
+    .replace(import.meta.env.BASE_URL, '/')
+
+  return appPath.split('/').filter(Boolean)
+}
+
 function App() {
 
   const [activePage, setActivePage] = useState(null)
@@ -114,30 +121,31 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [accessCode, setAccessCode] = useState('')
   const [adminSessionToken, setAdminSessionToken] = useState(() =>
-  window.location.pathname.split('/')[1] === 'beheer'
-    ? sessionStorage.getItem('res-politica-admin-session')
-    : null
-)
+    getAppPathParts()[0] === 'beheer'
+      ? sessionStorage.getItem('res-politica-admin-session')
+      : null
+  )
 
-const [isAdminSessionChecking, setIsAdminSessionChecking] = useState(() =>
-  window.location.pathname.split('/')[1] === 'beheer'
-)
+  const [isAdminSessionChecking, setIsAdminSessionChecking] = useState(() =>
+    getAppPathParts()[0] === 'beheer'
+  )
 
-const [isAdminRoute, setIsAdminRoute] = useState(() =>
-  window.location.pathname.split('/')[1] === 'beheer'
-)
+  const [isAdminRoute, setIsAdminRoute] = useState(() =>
+    getAppPathParts()[0] === 'beheer'
+  )
 
   const [refreshVersion, setRefreshVersion] = useState(0)
 
   useEffect(() => {
-    const pathParts = window.location.pathname.split('/')
-if (pathParts[1] === 'beheer') {
-  setIsAdminRoute(true)
-}
-    if (pathParts[1] === 'p' && pathParts[2]) {
-      setAccessToken(pathParts[2])
+    const pathParts = getAppPathParts()
+
+    if (pathParts[0] === 'beheer') {
+      setIsAdminRoute(true)
     }
 
+    if (pathParts[0] === 'p' && pathParts[1]) {
+      setAccessToken(pathParts[1])
+    }
   }, [])
 
 useEffect(() => {
@@ -920,7 +928,7 @@ if (isAdminRoute) {
             sessionStorage.removeItem('res-politica-admin-session')
             setAdminSessionToken(null)
             setIsAdminRoute(false)
-            window.history.pushState({}, '', '/')
+            window.history.pushState({}, '', import.meta.env.BASE_URL)
           } catch (error) {
             console.error('Uitloggen mislukt:', error)
             alert('Uitloggen is niet gelukt. Probeer het opnieuw.')
