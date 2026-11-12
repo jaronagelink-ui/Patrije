@@ -879,26 +879,6 @@ const handleCreateAffaire = async () => {
         className={`affaire-entity-link ${entityRow?.viewed_at ? '' : 'unseen'
           }`}
         type="button"
-        onMouseEnter={() => {
-          const sessionToken = sessionStorage.getItem(
-            `res-politica-session:${accessToken}`
-          )
-          if (sessionToken) {
-            prefetchEntityText(sessionToken, entity.id).catch(error => {
-              console.error('Vooraf laden entiteitstekst mislukt:', error)
-            })
-          }
-        }}
-        onFocus={() => {
-          const sessionToken = sessionStorage.getItem(
-            `res-politica-session:${accessToken}`
-          )
-          if (sessionToken) {
-            prefetchEntityText(sessionToken, entity.id).catch(error => {
-              console.error('Vooraf laden entiteitstekst mislukt:', error)
-            })
-          }
-        }}
         onClick={() => openEntity(entity)}
       >
         {part}
