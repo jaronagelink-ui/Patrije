@@ -1260,3 +1260,31 @@ color: #000;
     padding: 0;
   }
 }
+
+
+@media (max-width: 600px) {
+  .curiosa-dropdown {
+    left: 0;
+    right: auto;
+    transform: none;
+    width: min(230px, calc(100vw - 1rem));
+    max-width: calc(100vw - 1rem);
+  }
+}
+
+
+@media (max-width: 600px) {
+  .entity-header h1 {
+    font-size: 2rem;
+  }
+
+  .entity-subtitle {
+    font-size: 1rem;
+  }
+
+  .page-body p,
+  .affaire-text {
+    font-size: 0.98rem;
+    line-height: 1.7;
+  }
+}
