@@ -15,6 +15,7 @@ import {
   createPlayerAffaire,  
   getPlayerCharacter, 
   getEntityText, 
+  clearContentCache,
   authenticatePlayer, 
   markEntityViewed, 
   markAffaireViewed 
@@ -92,6 +93,26 @@ function OrnamentalDivider({ type }) {
   );
 }
 
+function getAppPathParts() {
+  const pathnameParts = window.location.pathname.split('/').filter(Boolean)
+  const basePathParts = import.meta.env.BASE_URL.split('/').filter(Boolean)
+
+  const basePathMatches = basePathParts.length > 0 &&
+    basePathParts.every((part, index) => pathnameParts[index] === part)
+
+  if (basePathMatches) {
+    return pathnameParts.slice(basePathParts.length)
+  }
+
+  // GitHub Pages kan de app ook met BASE_URL='/' laden.
+  // Verwijder dan alsnog de projectmap uit de URL.
+  if (pathnameParts[0] === 'Patrije') {
+    pathnameParts.shift()
+  }
+
+  return pathnameParts
+}
+
 function App() {
 
   const [activePage, setActivePage] = useState(null)
@@ -113,30 +134,31 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [accessCode, setAccessCode] = useState('')
   const [adminSessionToken, setAdminSessionToken] = useState(() =>
-  window.location.pathname.split('/')[1] === 'beheer'
-    ? sessionStorage.getItem('res-politica-admin-session')
-    : null
-)
+    getAppPathParts()[0] === 'beheer'
+      ? sessionStorage.getItem('res-politica-admin-session')
+      : null
+  )
 
-const [isAdminSessionChecking, setIsAdminSessionChecking] = useState(() =>
-  window.location.pathname.split('/')[1] === 'beheer'
-)
+  const [isAdminSessionChecking, setIsAdminSessionChecking] = useState(() =>
+    getAppPathParts()[0] === 'beheer'
+  )
 
-const [isAdminRoute, setIsAdminRoute] = useState(() =>
-  window.location.pathname.split('/')[1] === 'beheer'
-)
+  const [isAdminRoute, setIsAdminRoute] = useState(() =>
+    getAppPathParts()[0] === 'beheer'
+  )
 
   const [refreshVersion, setRefreshVersion] = useState(0)
 
   useEffect(() => {
-    const pathParts = window.location.pathname.split('/')
-if (pathParts[1] === 'beheer') {
-  setIsAdminRoute(true)
-}
-    if (pathParts[1] === 'p' && pathParts[2]) {
-      setAccessToken(pathParts[2])
+    const pathParts = getAppPathParts()
+
+    if (pathParts[0] === 'beheer') {
+      setIsAdminRoute(true)
     }
 
+    if (pathParts[0] === 'p' && pathParts[1]) {
+      setAccessToken(pathParts[1])
+    }
   }, [])
 
 useEffect(() => {
@@ -211,6 +233,7 @@ useEffect(() => {
   useEffect(() => {
     const handleStorage = (event) => {
       if (event.key === 'res-politica-entity-updated' && event.newValue) {
+        clearContentCache()
         setRefreshVersion(version => version + 1)
       }
     }
@@ -342,14 +365,23 @@ useEffect(() => {
 
   if (!sessionToken) return
 
+  let cancelled = false
+  setEntityText([])
+
   getEntityText(sessionToken, activeEntity.id)
     .then(data => {
+      if (cancelled) return
       console.log('Tekst van actieve entity:', data)
       setEntityText(data)
     })
     .catch(error => {
+      if (cancelled) return
       console.error('Fout bij ophalen entity-tekst:', error)
     })
+
+  return () => {
+    cancelled = true
+  }
 }, [activeEntity, currentPlayer, refreshVersion, accessToken])
 
 
@@ -368,14 +400,22 @@ useEffect(() => {
 
   if (!sessionToken) return
 
+  let cancelled = false
+  setPopupEntityText([])
+
   getEntityText(sessionToken, activePopupEntity.id)
     .then(data => {
-      setPopupEntityText(data)
+      if (!cancelled) setPopupEntityText(data)
     })
     .catch(error => {
+      if (cancelled) return
       console.error('Fout bij ophalen popup entity-tekst:', error)
       setPopupEntityText([])
     })
+
+  return () => {
+    cancelled = true
+  }
 }, [activePopupEntity, currentPlayer, refreshVersion, accessToken])
 
 
@@ -479,6 +519,10 @@ const toggleCuriosa = async (item) => {
   const openEntity = (entity) => {
     if (!entity) return
     console.log('OPEN ENTITY:', entity)
+
+    // Verwijder de inhoud van de vorige pagina direct bij navigatie.
+    setEntityText([])
+    setPopupEntityText([])
 
 if (currentPlayer) {
   const viewedAt = new Date().toISOString()
@@ -585,6 +629,8 @@ if (
 
     const previous = history[historyIndex - 1]
 
+    setEntityText([])
+    setAffairePosts([])
     setHistoryIndex(historyIndex - 1)
     setActivePopup(null)
 
@@ -604,6 +650,8 @@ if (
 
     const next = history[historyIndex + 1]
 
+    setEntityText([])
+    setAffairePosts([])
     setHistoryIndex(historyIndex + 1)
     setActivePopup(null)
 
@@ -633,6 +681,9 @@ if (
    * AFFAIRE OPENEN
    */
   const openAffaire = (affaireId) => {
+    setEntityText([])
+    setAffairePosts([])
+
     const newLocation = {
       page: 'affaire',
       affaireId
@@ -807,6 +858,8 @@ useEffect(() => {
 
   const viewedAt = new Date().toISOString()
 
+  setAffairePosts([])
+
   setAffaires(prev =>
     prev.map(item =>
       item.id === activeAffaire
@@ -888,7 +941,7 @@ if (isAdminRoute) {
             sessionStorage.removeItem('res-politica-admin-session')
             setAdminSessionToken(null)
             setIsAdminRoute(false)
-            window.history.pushState({}, '', '/')
+            window.history.pushState({}, '', import.meta.env.BASE_URL)
           } catch (error) {
             console.error('Uitloggen mislukt:', error)
             alert('Uitloggen is niet gelukt. Probeer het opnieuw.')
@@ -1256,6 +1309,7 @@ return (
               <div className="popup-image">
               <img
                 src={activePopupEntity.image_url}
+                decoding="async"
                 alt={activePopupEntity.name}
               />
             </div>
@@ -1303,6 +1357,8 @@ return (
     <img
       className="place-header-image"
       src={activeEntity.image_url}
+      fetchPriority="high"
+      decoding="async"
       alt=""
     />
   )}
@@ -1381,6 +1437,8 @@ return (
     <img
       className="group-crest"
       src={activeEntity.image_url}
+      fetchPriority="high"
+      decoding="async"
       alt={`Wapenschild van ${activeEntity.name}`}
     />
   )}
@@ -1474,6 +1532,8 @@ style={{
     <img
       className="character-image"
       src={activeEntity.image_url}
+      fetchPriority="high"
+      decoding="async"
       alt={activeEntity.name}
     />
   )}
@@ -1584,6 +1644,8 @@ style={{
     <img
       className="institute-initial"
       src={activeEntity.image_url}
+      fetchPriority="high"
+      decoding="async"
       alt=""
       aria-hidden="true"
     />
