@@ -94,8 +94,14 @@ function OrnamentalDivider({ type }) {
 }
 
 function getAppPathParts() {
-  const appPath = window.location.pathname
-    .replace(import.meta.env.BASE_URL, '/')
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const pathname = window.location.pathname
+
+  const appPath = pathname.startsWith(`${basePath}/`)
+    ? pathname.slice(basePath.length)
+    : pathname === basePath
+      ? '/'
+      : pathname
 
   return appPath.split('/').filter(Boolean)
 }
