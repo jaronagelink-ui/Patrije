@@ -1027,7 +1027,7 @@ return (
 <header className="site-header">
   <div className="site-banner">
     <img
-      src="/images/res-politica-banner.png"
+      src={`${import.meta.env.BASE_URL}images/res-politica-banner.png`}
       alt=""
       className="site-banner-image"
     />
