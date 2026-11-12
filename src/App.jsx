@@ -61,38 +61,43 @@ function PageHeader({
 
 
 function OrnamentalDivider({ type }) {
-    console.log('Ornament aangeroepen:', type);
+  console.log('Ornament aangeroepen:', type);
+
   const ornaments = {
-    karakter: '/Ornaments/karakter.png',
-    familie: '/Ornaments/familie.png',
-    stam: '/Ornaments/familie.png',
-    soort: '/Ornaments/familie.png',
-    instituut: '/Ornaments/instituut.png',
-    instituut2: '/Ornaments/instituut2.png',
-    plateau: '/Ornaments/plateau.png',
-    kroniek: '/Ornaments/kroniek.png',
-    groep: '/Ornaments/groep.png',
-    persoon: '/Ornaments/persoon.png',
-    godheid: '/Ornaments/persoon.png',
-    concept: '/Ornaments/concept.png',
-    plek: '/Ornaments/plek.png',
-    gebeurtenis: '/Ornaments/gebeurtenis.png',
-    affaire: '/Ornaments/affaire.png',
-    affaire2: '/Ornaments/affaire2.png',
-    header: '/Ornaments/header.png',
+    karakter: 'karakter.png',
+    familie: 'familie.png',
+    stam: 'familie.png',
+    soort: 'familie.png',
+    instituut: 'instituut.png',
+    instituut2: 'instituut2.png',
+    plateau: 'plateau.png',
+    kroniek: 'kroniek.png',
+    groep: 'groep.png',
+    persoon: 'persoon.png',
+    godheid: 'persoon.png',
+    concept: 'concept.png',
+    plek: 'plek.png',
+    gebeurtenis: 'gebeurtenis.png',
+    affaire: 'affaire.png',
+    affaire2: 'affaire2.png',
+    header: 'header.png',
   };
 
   const src = ornaments[type];
   console.log('Afbeeldingspad:', src);
-    if (!src) return null;
+
+  if (!src) return null;
 
   return (
     <div className="ornamental-divider">
-      <img src={src} alt="" aria-hidden="true" />
+      <img
+        src={`${import.meta.env.BASE_URL}Ornaments/${src}`}
+        alt=""
+        aria-hidden="true"
+      />
     </div>
   );
 }
-
 function getAppPathParts() {
   const pathnameParts = window.location.pathname.split('/').filter(Boolean)
   const basePathParts = import.meta.env.BASE_URL.split('/').filter(Boolean)
