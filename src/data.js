@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient'
 
 // Bewaar opgehaalde entiteitsteksten tijdens de actieve browsersessie.
@@ -579,6 +580,23 @@ export async function saveAdminPlayerCharacters(sessionToken, assignments) {
 
   return data
 }
+
+export async function saveAdminPlayerPin(sessionToken, playerId, pin) {
+  const { data, error } = await supabase.functions.invoke('admin-api', {
+    body: {
+      action: 'set_player_pin',
+      sessionToken,
+      playerId,
+      pin,
+    },
+  })
+
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+
+  return data
+}
+
 
 export async function resetAdminPlayerAccess(sessionToken, playerId) {
   const { data, error } = await supabase.functions.invoke(

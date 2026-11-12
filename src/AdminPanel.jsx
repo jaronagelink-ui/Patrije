@@ -19,6 +19,7 @@ import {
   createAdminPlayer,
   saveAdminPlayerCharacters,
   resetAdminPlayerAccess,
+  saveAdminPlayerPin,
     uploadEntityImage,
   deleteEntityImage,
   getAdminTextBlockAccess,
@@ -97,6 +98,9 @@ const [affaireAccess, setAffaireAccess] = useState([])
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [qrUrl, setQrUrl] = useState('')
   const [qrGenerating, setQrGenerating] = useState(false)
+  const [pinPlayer, setPinPlayer] = useState(null)
+  const [pinValue, setPinValue] = useState('')
+  const [pinSaving, setPinSaving] = useState(false)
 
 
   
@@ -122,6 +126,30 @@ const url = `${window.location.origin}${import.meta.env.BASE_URL}p/${token}`
       setQrGenerating(false)
     }
   }
+
+
+const handleSavePlayerPin = async () => {
+  if (!pinPlayer || !/^\d{4}$/.test(pinValue)) {
+    setError('Vul een PIN-code van precies vier cijfers in.')
+    return
+  }
+
+  setPinSaving(true)
+  setError('')
+  setMessage('')
+
+  try {
+    await saveAdminPlayerPin(adminSessionToken, pinPlayer.id, pinValue)
+    setMessage(`De PIN-code voor ${pinPlayer.name || 'de speler'} is opgeslagen.`)
+    setPinPlayer(null)
+    setPinValue('')
+  } catch (err) {
+    console.error(err)
+    setError(err.message || 'PIN-code opslaan is mislukt.')
+  } finally {
+    setPinSaving(false)
+  }
+}
 
 
 const handleResetPlayerAccess = async (player) => {
@@ -1044,6 +1072,18 @@ return (
 
   <button
     className="admin-primary"
+    onClick={() => {
+      setPinPlayer(player)
+      setPinValue('')
+      setError('')
+      setMessage('')
+    }}
+  >
+    PIN
+  </button>
+
+  <button
+    className="admin-primary"
     onClick={() => handleResetPlayerAccess(player)}
   >
     Reset
@@ -1158,6 +1198,84 @@ return (
                 {playersSaving ? 'Opslaan...' : 'Spelers opslaan'}
               </button>
             </div>
+
+            {pinPlayer && (
+              <div
+                onClick={() => {
+                  if (!pinSaving) {
+                    setPinPlayer(null)
+                    setPinValue('')
+                  }
+                }}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  background: 'rgba(0,0,0,0.65)',
+                  zIndex: 1001,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '1rem',
+                }}
+              >
+                <div
+                  className="admin-section-card"
+                  onClick={event => event.stopPropagation()}
+                  style={{
+                    background: 'white',
+                    color: '#25231f',
+                    padding: '2rem',
+                    borderRadius: '8px',
+                    width: '360px',
+                    maxWidth: '100%',
+                  }}
+                >
+                  <h3>PIN-code voor {pinPlayer.name || 'speler'}</h3>
+                  <p className="admin-help">
+                    Vul een code van vier cijfers in.
+                  </p>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    value={pinValue}
+                    onChange={event =>
+                      setPinValue(event.target.value.replace(/\D/g, '').slice(0, 4))
+                    }
+                    placeholder="Bijv. 1234"
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      marginTop: '0.5rem',
+                      fontSize: '1.5rem',
+                      letterSpacing: '0.2rem',
+                      textAlign: 'center',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                    <button
+                      className="admin-primary"
+                      onClick={handleSavePlayerPin}
+                      disabled={pinSaving || pinValue.length !== 4}
+                    >
+                      {pinSaving ? 'Opslaan...' : 'Opslaan'}
+                    </button>
+                    <button
+                      className="admin-secondary"
+                      onClick={() => {
+                        setPinPlayer(null)
+                        setPinValue('')
+                      }}
+                      disabled={pinSaving}
+                    >
+                      Annuleren
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {qrDataUrl && qrPlayer && (
               <div

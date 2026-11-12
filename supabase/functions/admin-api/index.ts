@@ -178,6 +178,7 @@ if (
   action === "set_affaire_access" ||
   action === "create_player" ||
   action === "reset_player_access" ||
+  action === "set_player_pin" ||
   action === "get_or_create_player_access_token" || 
   action === "get_admin_affaires" || 
   action === "get_admin_entities" ||
@@ -499,6 +500,41 @@ if (action === "delete_entity_text") {
       if (action === "verify") {
         return jsonResponse({ authenticated: true });
       }
+
+
+// PIN-CODE VAN EEN SPELER INSTELLEN
+if (action === "set_player_pin") {
+  const { playerId, pin } = body;
+
+  if (
+    typeof playerId !== "string" ||
+    !playerId ||
+    typeof pin !== "string" ||
+    !/^\d{4}$/.test(pin)
+  ) {
+    return jsonResponse(
+      { error: "Vul een PIN-code van precies vier cijfers in." },
+      400
+    );
+  }
+
+  const accessCodeHash = await sha256(pin);
+
+  const { data, error } = await supabase
+    .from("players")
+    .update({ access_code_hash: accessCodeHash })
+    .eq("id", playerId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (!data) {
+    return jsonResponse({ error: "Speler niet gevonden" }, 404);
+  }
+
+  return jsonResponse({ success: true });
+}
 
 
 // AFBEELDING VAN EEN ENTITEIT VERWIJDEREN
