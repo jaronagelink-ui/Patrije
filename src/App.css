@@ -1211,3 +1211,52 @@ color: #000;
   align-items: center;
   gap: 0.5rem;
 }
+
+/* MOBIELE BANNER */
+@media (max-width: 600px) {
+  .site-header {
+    padding: 0;
+  }
+
+  .site-banner picture {
+    display: block;
+    width: 100%;
+  }
+
+  .site-banner-image {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* De titel is onderdeel van de afbeelding; deze transparante knop
+     houdt het titelgebied klikbaar om naar het personage te gaan. */
+  .site-title-button {
+    left: 5%;
+    top: 10%;
+    width: 54%;
+    height: 20%;
+    transform: none;
+  }
+
+  /* De drie knoppen zijn in de mobiele afbeelding opgenomen. */
+  .site-header .main-nav {
+    left: 0;
+    right: 0;
+    top: 64%;
+    bottom: auto;
+    height: 36%;
+    gap: 0;
+  }
+
+  .site-header .main-nav > div {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .site-header .main-nav > div > button {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+  }
+}

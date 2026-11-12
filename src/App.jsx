@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import './App.css'
 import { supabase } from './supabaseClient'
 import AdminPanel from './AdminPanel'
@@ -14,7 +14,8 @@ import {
   getPlayerAffaires,
   createPlayerAffaire,  
   getPlayerCharacter, 
-  getEntityText, 
+  getEntityText,
+  prefetchEntityText,
   clearContentCache,
   authenticatePlayer, 
   markEntityViewed, 
@@ -61,8 +62,6 @@ function PageHeader({
 
 
 function OrnamentalDivider({ type }) {
-  console.log('Ornament aangeroepen:', type);
-
   const ornaments = {
     karakter: 'karakter.png',
     familie: 'familie.png',
@@ -84,8 +83,6 @@ function OrnamentalDivider({ type }) {
   };
 
   const src = ornaments[type];
-  console.log('Afbeeldingspad:', src);
-
   if (!src) return null;
 
   return (
@@ -153,6 +150,41 @@ function App() {
   )
 
   const [refreshVersion, setRefreshVersion] = useState(0)
+
+  // Bouw de entiteitszoekindex één keer per wijziging van de entiteitenlijst.
+  // renderAffaireText wordt op veel tekstblokken aangeroepen; sorteren en
+  // regex opbouwen bij iedere aanroep was onnodig renderwerk.
+  const entityTextLookup = useMemo(() => {
+    const rows = playerEntities
+      .filter(row => row.entities)
+      .sort((a, b) =>
+        b.entities.name.length - a.entities.name.length
+      )
+
+    if (rows.length === 0) {
+      return { regex: null, byName: new Map() }
+    }
+
+    const escapedNames = rows.map(row =>
+      row.entities.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    )
+
+    const byName = new Map()
+    rows.forEach(row => {
+      const name = row.entities.name.toLowerCase()
+      if (!byName.has(name)) {
+        byName.set(name, row)
+      }
+    })
+
+    return {
+      regex: new RegExp(
+        `(?<![\\p{L}\\p{N}_])(${escapedNames.join('|')})(?![\\p{L}\\p{N}_])`,
+        'giu'
+      ),
+      byName,
+    }
+  }, [playerEntities])
 
   useEffect(() => {
     const pathParts = getAppPathParts()
@@ -222,8 +254,6 @@ useEffect(() => {
     mounted = false
   }
 }, [isAdminRoute])
-
-  console.log('ACCESS TOKEN:', accessToken)
 
   useEffect(() => {
     if (!accessToken) return
@@ -362,7 +392,11 @@ useEffect(() => {
 
 
 useEffect(() => {
-  if (!activeEntity || !currentPlayer || !accessToken) return
+  // Een geopende popup is de actieve weergave; laad de achterliggende
+  // pagina pas weer wanneer de popup wordt gesloten.
+  if (!activeEntity || activePopup === 'entity' || !currentPlayer || !accessToken) {
+    return
+  }
 
   const sessionToken = sessionStorage.getItem(
     `res-politica-session:${accessToken}`
@@ -376,23 +410,24 @@ useEffect(() => {
   getEntityText(sessionToken, activeEntity.id)
     .then(data => {
       if (cancelled) return
-      console.log('Tekst van actieve entity:', data)
       setEntityText(data)
     })
     .catch(error => {
       if (cancelled) return
       console.error('Fout bij ophalen entity-tekst:', error)
+      setEntityText([])
     })
 
   return () => {
     cancelled = true
   }
-}, [activeEntity, currentPlayer, refreshVersion, accessToken])
+}, [activeEntity, activePopup, currentPlayer, refreshVersion, accessToken])
 
 
 
 useEffect(() => {
-  if (!activePopupEntity) {
+  // Een popup die gesloten is, mag geen tekst op de achtergrond ophalen.
+  if (activePopup !== 'entity' || !activePopupEntity) {
     setPopupEntityText([])
     return
   }
@@ -421,7 +456,7 @@ useEffect(() => {
   return () => {
     cancelled = true
   }
-}, [activePopupEntity, currentPlayer, refreshVersion, accessToken])
+}, [activePopup, activePopupEntity, currentPlayer, refreshVersion, accessToken])
 
 
 
@@ -534,8 +569,6 @@ const openEntity = (entity) => {
     return
   }
 
-  console.log('OPEN ENTITY:', entity)
-
   // Verwijder de inhoud van de vorige pagina direct bij navigatie.
   setEntityText([])
   setPopupEntityText([])
@@ -580,6 +613,9 @@ const openEntity = (entity) => {
     setActivePopup('entity')
     return
   }
+
+  // Een pagina vervangt een eventuele vorige popup volledig.
+  setActivePopupEntity(null)
 
   let page = null
 
@@ -739,8 +775,13 @@ const openEntity = (entity) => {
     setHistoryIndex(prev => prev + 1)
   }
 
-const toggleAffaires = async () => {
+const toggleAffaires = () => {
   if (!currentPlayer || !accessToken) return
+
+  const shouldOpen = !affairesOpen
+  setAffairesOpen(shouldOpen)
+
+  if (!shouldOpen) return
 
   const sessionToken = sessionStorage.getItem(
     `res-politica-session:${accessToken}`
@@ -751,17 +792,12 @@ const toggleAffaires = async () => {
     return
   }
 
-  if (!affairesOpen) {
-    try {
-      const data = await getPlayerAffaires(sessionToken)
-      setAffaires(data)
-    } catch (error) {
+  // Toon het menu direct; ververs de lijst op de achtergrond.
+  getPlayerAffaires(sessionToken)
+    .then(data => setAffaires(data))
+    .catch(error => {
       console.error('Fout bij verversen Affaires:', error)
-      return
-    }
-  }
-
-  setAffairesOpen(prev => !prev)
+    })
 }
 
 const handleCreateAffaire = async () => {
@@ -821,33 +857,14 @@ const handleCreateAffaire = async () => {
   const renderAffaireText = (text) => {
     if (!text) return null
 
-    const entityRows = playerEntities
-      .filter(row => row.entities)
-      .sort((a, b) =>
-        b.entities.name.length - a.entities.name.length
-      )
-    if (entityRows.length === 0) {
+    if (!entityTextLookup.regex) {
       return text
     }
-  
 
-  const escapedNames = entityRows.map(row =>
-    row.entities.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  )
-
-
-const regex = new RegExp(
-  `(?<![\\p{L}\\p{N}_])(${escapedNames.join('|')})(?![\\p{L}\\p{N}_])`,
-  'giu'
-)
-
-  const parts = text.split(regex)
+    const parts = text.split(entityTextLookup.regex)
 
   return parts.map((part, index) => {
-    const entityRow = entityRows.find(
-      row =>
-        row.entities.name.toLowerCase() === part.toLowerCase()
-    )
+    const entityRow = entityTextLookup.byName.get(part.toLowerCase())
 
     const entity = entityRow?.entities
 
@@ -862,6 +879,26 @@ const regex = new RegExp(
         className={`affaire-entity-link ${entityRow?.viewed_at ? '' : 'unseen'
           }`}
         type="button"
+        onMouseEnter={() => {
+          const sessionToken = sessionStorage.getItem(
+            `res-politica-session:${accessToken}`
+          )
+          if (sessionToken) {
+            prefetchEntityText(sessionToken, entity.id).catch(error => {
+              console.error('Vooraf laden entiteitstekst mislukt:', error)
+            })
+          }
+        }}
+        onFocus={() => {
+          const sessionToken = sessionStorage.getItem(
+            `res-politica-session:${accessToken}`
+          )
+          if (sessionToken) {
+            prefetchEntityText(sessionToken, entity.id).catch(error => {
+              console.error('Vooraf laden entiteitstekst mislukt:', error)
+            })
+          }
+        }}
         onClick={() => openEntity(entity)}
       >
         {part}
@@ -875,7 +912,12 @@ const currentAffaire = affaires.find(
 )
 
 useEffect(() => {
-  if (!activeAffaire || !currentPlayer || !accessToken) return
+  if (
+  activePage !== 'affaire' ||
+  !activeAffaire ||
+  !currentPlayer ||
+  !accessToken
+) return
 
   const sessionToken = sessionStorage.getItem(
     `res-politica-session:${accessToken}`
@@ -908,7 +950,7 @@ useEffect(() => {
     .catch(error => {
       console.error('Fout bij ophalen Affaire-posts:', error)
     })
-}, [activeAffaire, currentPlayer, accessToken])
+}, [activeAffaire, activePage, currentPlayer, accessToken])
 
 
 
@@ -1053,11 +1095,17 @@ return (
 
 <header className="site-header">
   <div className="site-banner">
-    <img
-      src={`${import.meta.env.BASE_URL}images/res-politica-banner.png`}
-      alt=""
-      className="site-banner-image"
-    />
+    <picture>
+      <source
+        media="(max-width: 600px)"
+        srcSet={`${import.meta.env.BASE_URL}images/res-politica-mobiel.jpg`}
+      />
+      <img
+        src={`${import.meta.env.BASE_URL}images/res-politica-banner.png`}
+        alt=""
+        className="site-banner-image"
+      />
+    </picture>
 
     <button
       className="site-title site-title-button"
@@ -1336,6 +1384,8 @@ return (
               <div className="popup-image">
               <img
                 src={activePopupEntity.image_url}
+                loading="eager"
+                fetchPriority="high"
                 decoding="async"
                 alt={activePopupEntity.name}
               />
@@ -1384,6 +1434,7 @@ return (
     <img
       className="place-header-image"
       src={activeEntity.image_url}
+      loading="eager"
       fetchPriority="high"
       decoding="async"
       alt=""
@@ -1464,6 +1515,7 @@ return (
     <img
       className="group-crest"
       src={activeEntity.image_url}
+      loading="eager"
       fetchPriority="high"
       decoding="async"
       alt={`Wapenschild van ${activeEntity.name}`}
@@ -1559,6 +1611,7 @@ style={{
     <img
       className="character-image"
       src={activeEntity.image_url}
+      loading="eager"
       fetchPriority="high"
       decoding="async"
       alt={activeEntity.name}
@@ -1671,6 +1724,7 @@ style={{
     <img
       className="institute-initial"
       src={activeEntity.image_url}
+      loading="eager"
       fetchPriority="high"
       decoding="async"
       alt=""
@@ -1706,12 +1760,12 @@ style={{
   activeEntity.name === 'Patrije' && (
     <div className="plateau-map">
       <a
-        href="/images/patrijekaart.jpg"
+        href={`${import.meta.env.BASE_URL}images/patrijekaart.jpg`}
         target="_blank"
         rel="noopener noreferrer"
       >
         <img
-          src="/images/patrijekaart.jpg"
+          src={`${import.meta.env.BASE_URL}images/patrijekaart.jpg`}
           alt="Kaart van Patrije"
         />
       </a>
