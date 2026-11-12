@@ -106,7 +106,7 @@ const [affaireAccess, setAffaireAccess] = useState([])
 
     try {
       const token = await getOrCreatePlayerAccessToken(adminSessionToken, player.id)
-const url = `http://192.168.1.197:5173/p/${token}`
+const url = `${window.location.origin}${import.meta.env.BASE_URL}p/${token}`
       const dataUrl = await QRCode.toDataURL(url, { width: 320, margin: 2 })
 
       const updatedPlayer = { ...player, access_token: token }
