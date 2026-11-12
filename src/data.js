@@ -1,5 +1,15 @@
 import { supabase } from './supabaseClient'
 
+// Bewaar opgehaalde entiteitsteksten tijdens de actieve browsersessie.
+const entityTextCache = new Map()
+const affairePostsCache = new Map()
+const CONTENT_CACHE_TTL = 5 * 60 * 1000
+
+export function clearContentCache() {
+  entityTextCache.clear()
+  affairePostsCache.clear()
+}
+
 
 export async function getPlayerEntities(sessionToken) {
   return callPlayerApi(sessionToken, 'get_entities')
@@ -10,9 +20,28 @@ export async function getPlayerCharacter(sessionToken) {
 }
 
 export async function getEntityText(sessionToken, entityId) {
-  return callPlayerApi(sessionToken, 'get_entity_text', {
+  const cacheKey = `${sessionToken}:${entityId}`
+  const cached = entityTextCache.get(cacheKey)
+
+  if (cached && Date.now() - cached.timestamp < CONTENT_CACHE_TTL) {
+    return cached.promise
+  }
+
+  const promise = callPlayerApi(sessionToken, 'get_entity_text', {
     entityId,
   })
+
+  entityTextCache.set(cacheKey, {
+    timestamp: Date.now(),
+    promise,
+  })
+
+  try {
+    return await promise
+  } catch (error) {
+    entityTextCache.delete(cacheKey)
+    throw error
+  }
 }
 
 
@@ -72,17 +101,39 @@ export async function createPlayerAffaire(sessionToken, name, subtitle) {
 
 
 export async function getAffairePosts(sessionToken, affaireId) {
-  return callPlayerApi(sessionToken, 'get_affaire_posts', {
+  const cacheKey = `${sessionToken}:${affaireId}`
+  const cached = affairePostsCache.get(cacheKey)
+
+  if (cached && Date.now() - cached.timestamp < CONTENT_CACHE_TTL) {
+    return cached.promise
+  }
+
+  const promise = callPlayerApi(sessionToken, 'get_affaire_posts', {
     affaireId,
   })
+
+  affairePostsCache.set(cacheKey, {
+    timestamp: Date.now(),
+    promise,
+  })
+
+  try {
+    return await promise
+  } catch (error) {
+    affairePostsCache.delete(cacheKey)
+    throw error
+  }
 }
 
 
 export async function addAffairePost(sessionToken, affaireId, content) {
-  return callPlayerApi(sessionToken, 'add_affaire_post', {
+  const result = await callPlayerApi(sessionToken, 'add_affaire_post', {
     affaireId,
     content,
   })
+
+  affairePostsCache.delete(`${sessionToken}:${affaireId}`)
+  return result
 }
 
 
