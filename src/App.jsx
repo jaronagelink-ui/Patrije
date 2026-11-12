@@ -15,7 +15,6 @@ import {
   createPlayerAffaire,  
   getPlayerCharacter, 
   getEntityText,
-  prefetchEntityText,
   clearContentCache,
   authenticatePlayer, 
   markEntityViewed, 
