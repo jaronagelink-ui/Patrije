@@ -521,112 +521,134 @@ const toggleCuriosa = async (item) => {
   }
 }
 
-  const openEntity = (entity) => {
-    if (!entity) return
-    console.log('OPEN ENTITY:', entity)
+const openEntity = (entity) => {
+  if (!entity) return
 
-    // Verwijder de inhoud van de vorige pagina direct bij navigatie.
-    setEntityText([])
-    setPopupEntityText([])
-
-if (currentPlayer) {
-  const viewedAt = new Date().toISOString()
-
-  // Meteen lokaal als gezien markeren
-  setPlayerEntities(prev =>
-    prev.map(row =>
-      row.entity_id === entity.id
-        ? {
-            ...row,
-            viewed_at: viewedAt
-          }
-        : row
-    )
-  )
-
-// Daarna permanent opslaan in Supabase
-const storageKey = `res-politica-session:${accessToken}`
-const sessionToken = sessionStorage.getItem(storageKey)
-
-if (sessionToken) {
-  markEntityViewed(sessionToken, entity.id)
-    .catch(error => {
-      console.error('Fout bij markeren entity als gezien:', error)
-    })
-}}
- // Entiteiten die als popup openen,
-    // komen niet in de navigatiegeschiedenis.
-if (
-  entity.type === 'persoon' ||
-  entity.type === 'concept' ||
-  entity.type === 'godheid' ||
-  entity.type === 'gebeurtenis' ||
-  entity.type === 'plek'
-) {
-  setActivePopupEntity(entity)
-  setActivePopup('entity')
-  return
-}
-    let page = null
-    if (
-      entity.type === 'familie' ||
-      entity.type === 'stam' ||
-      entity.type === 'soort' ||
-      entity.type === 'organisatie' ||
-      entity.type === 'factie'
-    ) {
-      page = 'groep'
-    }
-    if (
-      entity.type === 'instituut' ||
-      entity.type === 'plateau'
-    ) {
-      page = 'instituut'
-    }
-    if (
-      entity.type === 'hoofdstad' ||
-      entity.type === 'vrijstad' ||
-      entity.type === 'stad' ||
-      entity.type === 'plaats'
-    ) {
-      page = 'plaats'
-    }
-    if (entity.type === 'kroniek') {
-      page = 'kroniek'
-    }
-    if (entity.type === 'karakter') {
-      page = 'karakter'
-    }
-    if (!page) {
-      return
-    }
-    const newLocation = {
-      page,
-      entity
-    }
-
-    setActivePopup(null)
-    setActiveEntity(entity)
-    setActivePage(page)
-
-    setHistory(prev => {
-      const newHistory = prev.slice(0, historyIndex + 1)
-
-      // Voorkom dubbele pagina's achter elkaar
-      const currentLocation = newHistory[newHistory.length - 1]
-
-      if (
-        currentLocation?.page === newLocation.page &&
-        currentLocation?.entity?.id === newLocation.entity?.id
-      ) {
-        return newHistory
-      }
-
-      return [...newHistory, newLocation]
-    })
-
-    setHistoryIndex(prev => prev + 1)
+  // Zelfverwijzing: laat de huidige pagina intact.
+  if (activeEntity?.id === entity.id && activePopup !== 'entity') {
+    return
   }
+
+  // Zelfverwijzing vanuit een geopende entiteit-popup.
+  if (activePopup === 'entity' && activePopupEntity?.id === entity.id) {
+    return
+  }
+
+  console.log('OPEN ENTITY:', entity)
+
+  // Verwijder de inhoud van de vorige pagina direct bij navigatie.
+  setEntityText([])
+  setPopupEntityText([])
+
+  if (currentPlayer) {
+    const viewedAt = new Date().toISOString()
+
+    // Meteen lokaal als gezien markeren
+    setPlayerEntities(prev =>
+      prev.map(row =>
+        row.entity_id === entity.id
+          ? {
+              ...row,
+              viewed_at: viewedAt
+            }
+          : row
+      )
+    )
+
+    // Daarna permanent opslaan in Supabase
+    const storageKey = `res-politica-session:${accessToken}`
+    const sessionToken = sessionStorage.getItem(storageKey)
+
+    if (sessionToken) {
+      markEntityViewed(sessionToken, entity.id)
+        .catch(error => {
+          console.error('Fout bij markeren entity als gezien:', error)
+        })
+    }
+  }
+
+  // Entiteiten die als popup openen,
+  // komen niet in de navigatiegeschiedenis.
+  if (
+    entity.type === 'persoon' ||
+    entity.type === 'concept' ||
+    entity.type === 'godheid' ||
+    entity.type === 'gebeurtenis' ||
+    entity.type === 'plek'
+  ) {
+    setActivePopupEntity(entity)
+    setActivePopup('entity')
+    return
+  }
+
+  let page = null
+
+  if (
+    entity.type === 'familie' ||
+    entity.type === 'stam' ||
+    entity.type === 'soort' ||
+    entity.type === 'organisatie' ||
+    entity.type === 'factie'
+  ) {
+    page = 'groep'
+  }
+
+  if (
+    entity.type === 'instituut' ||
+    entity.type === 'plateau'
+  ) {
+    page = 'instituut'
+  }
+
+  if (
+    entity.type === 'hoofdstad' ||
+    entity.type === 'vrijstad' ||
+    entity.type === 'stad' ||
+    entity.type === 'plaats'
+  ) {
+    page = 'plaats'
+  }
+
+  if (entity.type === 'kroniek') {
+    page = 'kroniek'
+  }
+
+  if (entity.type === 'karakter') {
+    page = 'karakter'
+  }
+
+  if (!page) {
+    return
+  }
+
+  const newLocation = {
+    page,
+    entity
+  }
+
+  setActivePopup(null)
+  setActiveEntity(entity)
+  setActivePage(page)
+
+  setHistory(prev => {
+    const newHistory = prev.slice(0, historyIndex + 1)
+
+    // Voorkom dubbele pagina's achter elkaar
+    const currentLocation = newHistory[newHistory.length - 1]
+
+    if (
+      currentLocation?.page === newLocation.page &&
+      currentLocation?.entity?.id === newLocation.entity?.id
+    ) {
+      return newHistory
+    }
+
+    return [...newHistory, newLocation]
+  })
+
+  setHistoryIndex(prev => prev + 1)
+}
+
 
 
   const goBack = () => {
