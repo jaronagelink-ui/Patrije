@@ -94,16 +94,23 @@ function OrnamentalDivider({ type }) {
 }
 
 function getAppPathParts() {
-  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
-  const pathname = window.location.pathname
+  const pathnameParts = window.location.pathname.split('/').filter(Boolean)
+  const basePathParts = import.meta.env.BASE_URL.split('/').filter(Boolean)
 
-  const appPath = pathname.startsWith(`${basePath}/`)
-    ? pathname.slice(basePath.length)
-    : pathname === basePath
-      ? '/'
-      : pathname
+  const basePathMatches = basePathParts.length > 0 &&
+    basePathParts.every((part, index) => pathnameParts[index] === part)
 
-  return appPath.split('/').filter(Boolean)
+  if (basePathMatches) {
+    return pathnameParts.slice(basePathParts.length)
+  }
+
+  // GitHub Pages kan de app ook met BASE_URL='/' laden.
+  // Verwijder dan alsnog de projectmap uit de URL.
+  if (pathnameParts[0] === 'Patrije') {
+    pathnameParts.shift()
+  }
+
+  return pathnameParts
 }
 
 function App() {
