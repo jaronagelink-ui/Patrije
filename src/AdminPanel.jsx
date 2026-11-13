@@ -437,7 +437,12 @@ const data = await getAdminAffaireAccess(
     setError('')
     setMessage('Alle wijzigingen opslaan...')
     try {
-      const savedEntity = await saveEntity(adminSessionToken, entity)
+      const entityToSave = {
+  ...entity,
+  id: entity.id || selectedId,
+}
+
+const savedEntity = await saveEntity(adminSessionToken, entityToSave)
 
       const savedTexts = await Promise.all(
         textBlocks.map(block => saveEntityText(adminSessionToken, { ...block, entity_id: savedEntity.id }))

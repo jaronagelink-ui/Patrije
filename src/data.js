@@ -4,11 +4,13 @@ import { supabase } from './supabaseClient'
 // Bewaar opgehaalde entiteitsteksten tijdens de actieve browsersessie.
 const entityTextCache = new Map()
 const affairePostsCache = new Map()
+const playerAffairesCache = new Map()
 const CONTENT_CACHE_TTL = 5 * 60 * 1000
 
 export function clearContentCache() {
   entityTextCache.clear()
   affairePostsCache.clear()
+  playerAffairesCache.clear()
 }
 
 
@@ -24,25 +26,45 @@ export async function getEntityText(sessionToken, entityId) {
   const cacheKey = `${sessionToken}:${entityId}`
   const cached = entityTextCache.get(cacheKey)
 
-  if (cached && Date.now() - cached.timestamp < CONTENT_CACHE_TTL) {
+  if (cached && (cached.pending || Date.now() - cached.timestamp < CONTENT_CACHE_TTL)) {
     return cached.promise
   }
 
   const promise = callPlayerApi(sessionToken, 'get_entity_text', {
     entityId,
+  }).then(data => {
+    const current = entityTextCache.get(cacheKey)
+
+    // Laat de cache vijf minuten geldig blijven vanaf het moment
+    // waarop de inhoud daadwerkelijk is opgehaald.
+    if (current?.promise === promise) {
+      current.timestamp = Date.now()
+      current.pending = false
+    }
+
+    return data
+  }).catch(error => {
+    // Verwijder alleen deze aanvraag; een nieuwere aanvraag blijft intact.
+    if (entityTextCache.get(cacheKey)?.promise === promise) {
+      entityTextCache.delete(cacheKey)
+    }
+
+    throw error
   })
 
   entityTextCache.set(cacheKey, {
     timestamp: Date.now(),
+    pending: true,
     promise,
   })
 
-  try {
-    return await promise
-  } catch (error) {
-    entityTextCache.delete(cacheKey)
-    throw error
-  }
+  return promise
+}
+
+// Start het ophalen alvast wanneer een speler een entiteitslink aanwijst.
+// Dezelfde cache voorkomt een tweede aanvraag wanneer de link wordt geopend.
+export function prefetchEntityText(sessionToken, entityId) {
+  return getEntityText(sessionToken, entityId)
 }
 
 
@@ -88,14 +110,43 @@ export async function markAffaireViewed(sessionToken, affaireId) {
   })
 }
 export async function getPlayerAffaires(sessionToken) {
-  return callPlayerApi(sessionToken, 'get_player_affaires')
+  const cached = playerAffairesCache.get(sessionToken)
+  if (cached && (cached.pending || Date.now() - cached.timestamp < CONTENT_CACHE_TTL)) {
+    return cached.promise
+  }
+
+  const promise = callPlayerApi(sessionToken, 'get_player_affaires')
+    .then(data => {
+      const current = playerAffairesCache.get(sessionToken)
+      if (current?.promise === promise) {
+        current.timestamp = Date.now()
+        current.pending = false
+      }
+      return data
+    })
+    .catch(error => {
+      if (playerAffairesCache.get(sessionToken)?.promise === promise) {
+        playerAffairesCache.delete(sessionToken)
+      }
+      throw error
+    })
+
+  playerAffairesCache.set(sessionToken, {
+    timestamp: Date.now(),
+    pending: true,
+    promise,
+  })
+
+  return promise
 }
 
 export async function createPlayerAffaire(sessionToken, name, subtitle) {
-  return callPlayerApi(sessionToken, 'create_player_affaire', {
+  const result = await callPlayerApi(sessionToken, 'create_player_affaire', {
     name,
     subtitle,
   })
+  playerAffairesCache.delete(sessionToken)
+  return result
 }
 
 
@@ -105,7 +156,7 @@ export async function getAffairePosts(sessionToken, affaireId) {
   const cacheKey = `${sessionToken}:${affaireId}`
   const cached = affairePostsCache.get(cacheKey)
 
-  if (cached && Date.now() - cached.timestamp < CONTENT_CACHE_TTL) {
+  if (cached && (cached.pending || Date.now() - cached.timestamp < CONTENT_CACHE_TTL)) {
     return cached.promise
   }
 
@@ -364,11 +415,18 @@ export async function saveEntity(sessionToken, entity) {
 }
 
 export async function saveEntityText(sessionToken, block) {
+  // Tijdelijke client-ID's (new-...) zijn alleen bedoeld voor React.
+  // Laat ze weg zodat de API het blok als nieuw record kan invoegen.
+  const payload = { ...block }
+  if (typeof payload.id === 'string' && payload.id.startsWith('new-')) {
+    delete payload.id
+  }
+
   const { data, error } = await supabase.functions.invoke('admin-api', {
     body: {
       action: 'save_entity_text',
       sessionToken,
-      block,
+      block: payload,
     },
   })
 

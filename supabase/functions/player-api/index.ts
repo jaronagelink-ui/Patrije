@@ -491,17 +491,11 @@ case "get_player_affaires": {
     ])
   );
 
-// Toon alleen gekoppelde én toegankelijke Affaires.
-const playerAffaireIds = new Set(
-  (playerAffaires ?? []).map(row => row.affaire_id)
-);
-
+// Iedere speler ziet standaard alle Affaires.
+// Alleen een expliciete regel met available = false verbergt een Affaire.
 const result = (affaires ?? [])
-  .filter(affaire =>
-    playerAffaireIds.has(affaire.id) &&
-    !deniedAffaires.has(affaire.id)
-  )
-  .map(affaire => ({
+  .filter(affaire => !deniedAffaires.has(affaire.id))
+    .map(affaire => ({
     ...affaire,
     viewed_at: viewedByAffaire.get(affaire.id) ?? null,
   }))
@@ -520,38 +514,24 @@ case "mark_affaire_viewed": {
     return jsonResponse({ error: "Ongeldige affaire" }, 400);
   }
 
-  // Controleer of deze speler toegang heeft tot de affaire.
-  const [
-    { data: affaire, error: affaireError },
-    { data: accessRule, error: accessError },
-  ] = await Promise.all([
-    supabase
-      .from("player_affaires")
-      .select("affaire_id")
-      .eq("player_id", playerId)
-      .eq("affaire_id", affaireId)
-      .maybeSingle(),
-
-    supabase
-      .from("affaire_access")
-      .select("available")
-      .eq("player_id", playerId)
-      .eq("affaire_id", affaireId)
-      .maybeSingle(),
-  ]);
-
-  if (affaireError) throw affaireError;
-  if (accessError) throw accessError;
-
-  if (!affaire || accessRule?.available === false) {
+  // Een Affaire is standaard toegankelijk, tenzij de beheerder
+  // deze expliciet voor deze speler heeft uitgeschakeld.
+  if (!(await canAccessAffaire(affaireId))) {
     return jsonResponse({ error: "Geen toegang tot deze affaire" }, 403);
   }
 
+  // Registreer het bekijken, ook als er nog geen persoonlijke
+  // koppeling voor deze speler bestond.
   const { error } = await supabase
     .from("player_affaires")
-    .update({ viewed_at: new Date().toISOString() })
-    .eq("player_id", playerId)
-    .eq("affaire_id", affaireId);
+    .upsert(
+      {
+        player_id: playerId,
+        affaire_id: affaireId,
+        viewed_at: new Date().toISOString(),
+      },
+      { onConflict: "player_id,affaire_id" }
+    );
 
   if (error) throw error;
 
