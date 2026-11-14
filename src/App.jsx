@@ -114,6 +114,27 @@ function getAppPathParts() {
   return pathnameParts
 }
 
+const TEXT_BLOCK_ORDER = [
+  'body',
+  'general',
+  'additional_2',
+  'bullet_list',
+  'additional_3',
+  'genealogy_list',
+  'institute_members',
+]
+
+function sortVisibleTextBlocks(blocks) {
+  return (blocks || [])
+    .filter(block => typeof block.content === 'string' && block.content.trim() !== '')
+    .sort((a, b) => {
+      const aIndex = TEXT_BLOCK_ORDER.indexOf(a.block_type)
+      const bIndex = TEXT_BLOCK_ORDER.indexOf(b.block_type)
+      return (aIndex < 0 ? TEXT_BLOCK_ORDER.length : aIndex) -
+        (bIndex < 0 ? TEXT_BLOCK_ORDER.length : bIndex)
+    })
+}
+
 function App() {
 
   const [activePage, setActivePage] = useState(null)
@@ -409,7 +430,7 @@ useEffect(() => {
   getEntityText(sessionToken, activeEntity.id)
     .then(data => {
       if (cancelled) return
-      setEntityText(data)
+      setEntityText(sortVisibleTextBlocks(data))
     })
     .catch(error => {
       if (cancelled) return
@@ -444,7 +465,7 @@ useEffect(() => {
 
   getEntityText(sessionToken, activePopupEntity.id)
     .then(data => {
-      if (!cancelled) setPopupEntityText(data)
+      if (!cancelled) setPopupEntityText(sortVisibleTextBlocks(data))
     })
     .catch(error => {
       if (cancelled) return
@@ -1372,15 +1393,19 @@ return (
           )}
 
 <div className="page-body">
-  {popupEntityText.length > 0 ? (
-    popupEntityText.map((block) => (
-      <p key={block.id}>
-        {renderAffaireText(block.content)}
-      </p>
-    ))
-  ) : (
-    <p>Entiteit wordt geladen...</p>
-  )}
+  {popupEntityText.map((block) => (
+    <div key={block.id}>
+      {block.block_type === 'bullet_list' ? (
+        <ul>
+          {block.content.split('\n').filter(line => line.trim() !== '').map((line, index) => (
+            <li key={index}>{renderAffaireText(line)}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>{renderAffaireText(block.content)}</p>
+      )}
+    </div>
+  ))}
 </div>
         </section>
       </div>

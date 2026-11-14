@@ -29,6 +29,25 @@ getAdminAffaireAccess,
 setPlayerAffaireAccess,
 } from './data'
 
+const TEXT_BLOCK_ORDER = [
+  'body',
+  'general',
+  'additional_2',
+  'bullet_list',
+  'additional_3',
+  'genealogy_list',
+  'institute_members',
+]
+
+function sortTextBlocks(blocks) {
+  return [...blocks].sort((a, b) => {
+    const aIndex = TEXT_BLOCK_ORDER.indexOf(a.block_type)
+    const bIndex = TEXT_BLOCK_ORDER.indexOf(b.block_type)
+    return (aIndex < 0 ? TEXT_BLOCK_ORDER.length : aIndex) -
+      (bIndex < 0 ? TEXT_BLOCK_ORDER.length : bIndex)
+  })
+}
+
 const ENTITY_TYPES = [
   ['persoon', 'Persoon'],
   ['concept', 'Concept'],
@@ -341,7 +360,7 @@ const data = await getAdminAffaireAccess(
       ])
 
       setEntity(details.entity)
-      setTextBlocks(textData)
+      setTextBlocks(sortTextBlocks(textData))
       setProperties(propertyData)
       setRelations(relationData)
       setAccess(accessData)
@@ -497,7 +516,7 @@ const savedEntity = await saveEntity(adminSessionToken, entityToSave)
 
       setEntity(savedEntity)
       setSelectedId(savedEntity.id)
-      setTextBlocks(savedTexts)
+      setTextBlocks(sortTextBlocks(savedTexts))
       setProperties(savedProperties)
       setRelations(savedRelations)
       setDeletedTextIds([])
@@ -547,10 +566,27 @@ const savedEntity = await saveEntity(adminSessionToken, entityToSave)
   }
 
   const addTextBlock = () => {
-    setTextBlocks(current => [
+    const nextType = TEXT_BLOCK_ORDER.find(type =>
+      !textBlocks.some(block => block.block_type === type)
+    )
+
+    if (!nextType) {
+      setError('Alle vaste tekstvelden bestaan al. Je kunt een bestaand veld bewerken.')
+      return
+    }
+
+    setTextBlocks(current => sortTextBlocks([
       ...current,
-      { id: `new-${Date.now()}`, entity_id: entity.id, block_type: 'body', content: '', published: true, unsaved: true },
-    ])
+      {
+        id: `new-${Date.now()}`,
+        entity_id: entity.id,
+        block_type: nextType,
+        content: '',
+        published: true,
+        unsaved: true,
+      },
+    ]))
+    setError('')
   }
 
   const saveProperty = async (property) => {
@@ -870,19 +906,21 @@ const savedEntity = await saveEntity(adminSessionToken, entityToSave)
   <select
     value={block.block_type || 'body'}
     onChange={e =>
-      setTextBlocks(c =>
+      setTextBlocks(c => sortTextBlocks(
         c.map(x =>
           x.id === block.id
             ? { ...x, block_type: e.target.value }
             : x
         )
-      )
+      ))
     }
   >
     <option value="body">Body — gewone tekst</option>
-    <option value="general">General</option>
+    <option value="general">Aanvullende tekst 1</option>
+    <option value="additional_2">Aanvullende tekst 2</option>
     <option value="institute_members">Institute members</option>
     <option value="bullet_list">Bulletpoints — opsomming</option>
+    <option value="additional_3">Aanvullende tekst 3</option>
     <option value="genealogy_list">Genealogische lijst</option>
   </select>
 

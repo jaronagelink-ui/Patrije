@@ -338,17 +338,34 @@ case "get_entities": {
           rulesByBlock.set(rule.entity_text_id, existing);
         }
 
-        const visibleBlocks = (blocks ?? []).filter((block) => {
-          const blockRules = rulesByBlock.get(block.id);
+        const blockOrder: Record<string, number> = {
+          body: 0,
+          general: 1,
+          additional_2: 2,
+          bullet_list: 3,
+          additional_3: 4,
+          genealogy_list: 5,
+          institute_members: 6,
+        };
 
-          if (!blockRules?.length) return true;
+        const visibleBlocks = (blocks ?? [])
+          .filter((block) => {
+            if (typeof block.content !== 'string' || !block.content.trim()) {
+              return false;
+            }
 
-          return blockRules.some(
-            (rule) =>
-              rule.player_id === playerId &&
-              rule.available === true,
+            const blockRules = rulesByBlock.get(block.id);
+            if (!blockRules?.length) return true;
+
+            return blockRules.some(
+              (rule) =>
+                rule.player_id === playerId &&
+                rule.available === true,
+            );
+          })
+          .sort((a, b) =>
+            (blockOrder[a.block_type] ?? 99) - (blockOrder[b.block_type] ?? 99)
           );
-        });
 
         return jsonResponse(visibleBlocks);
       }
